@@ -1,0 +1,179 @@
+{
+  "summary": {
+    "total": 27,
+    "passed": 26,
+    "failed": 1,
+    "score": 96.3
+  },
+  "sections": [
+    {
+      "name": "Structure Tests",
+      "marker": "structure",
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "score": 100.0,
+      "tests": [
+        {
+          "name": "test_agent_directory_exists",
+          "outcome": "passed",
+          "duration": 0.0002
+        },
+        {
+          "name": "test_app_directory_exists",
+          "outcome": "passed",
+          "duration": 0.0002
+        },
+        {
+          "name": "test_requirements_txt_exists",
+          "outcome": "passed",
+          "duration": 0.0002
+        }
+      ]
+    },
+    {
+      "name": "Server Tests",
+      "marker": "server",
+      "total": 3,
+      "passed": 2,
+      "failed": 1,
+      "skipped": 0,
+      "score": 66.67,
+      "tests": [
+        {
+          "name": "test_server_starts",
+          "outcome": "passed",
+          "duration": 0.0004
+        },
+        {
+          "name": "test_agent_card_endpoint",
+          "outcome": "passed",
+          "duration": 0.026
+        },
+        {
+          "name": "test_invoke_agent",
+          "outcome": "failed",
+          "duration": 0.1771
+        }
+      ]
+    },
+    {
+      "name": "Agent Tests",
+      "marker": "agent_tests",
+      "total": 21,
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0,
+      "score": 100.0,
+      "tests": [
+        {
+          "name": "test_correct_conversion_calculation",
+          "outcome": "passed",
+          "duration": 0.0156
+        },
+        {
+          "name": "test_stale_flag_propagated",
+          "outcome": "passed",
+          "duration": 0.0009
+        },
+        {
+          "name": "test_error_from_rate_propagated",
+          "outcome": "passed",
+          "duration": 0.0013
+        },
+        {
+          "name": "test_response_contains_all_keys",
+          "outcome": "passed",
+          "duration": 0.0009
+        },
+        {
+          "name": "test_currencies_uppercased",
+          "outcome": "passed",
+          "duration": 0.0009
+        },
+        {
+          "name": "test_successful_rate_retrieval",
+          "outcome": "passed",
+          "duration": 0.0026
+        },
+        {
+          "name": "test_response_shape_keys",
+          "outcome": "passed",
+          "duration": 0.0016
+        },
+        {
+          "name": "test_api_failure_returns_stale_cache",
+          "outcome": "passed",
+          "duration": 0.0011
+        },
+        {
+          "name": "test_api_failure_no_cache_returns_error",
+          "outcome": "passed",
+          "duration": 0.001
+        },
+        {
+          "name": "test_currencies_uppercased",
+          "outcome": "passed",
+          "duration": 0.0018
+        },
+        {
+          "name": "test_agent_exchange_rate_query",
+          "outcome": "passed",
+          "duration": 3.3974
+        },
+        {
+          "name": "test_known_country_germany",
+          "outcome": "passed",
+          "duration": 0.001
+        },
+        {
+          "name": "test_known_country_japan",
+          "outcome": "passed",
+          "duration": 0.0007
+        },
+        {
+          "name": "test_known_country_united_states",
+          "outcome": "passed",
+          "duration": 0.0007
+        },
+        {
+          "name": "test_alias_usa",
+          "outcome": "passed",
+          "duration": 0.0007
+        },
+        {
+          "name": "test_alias_uk",
+          "outcome": "passed",
+          "duration": 0.0006
+        },
+        {
+          "name": "test_iso_code_passthrough_eur",
+          "outcome": "passed",
+          "duration": 0.0006
+        },
+        {
+          "name": "test_iso_code_case_insensitive",
+          "outcome": "passed",
+          "duration": 0.0006
+        },
+        {
+          "name": "test_unknown_country_returns_error",
+          "outcome": "passed",
+          "duration": 0.001
+        },
+        {
+          "name": "test_country_case_insensitive",
+          "outcome": "passed",
+          "duration": 0.0006
+        },
+        {
+          "name": "test_country_thailand",
+          "outcome": "passed",
+          "duration": 0.0006
+        }
+      ],
+      "coverage": 38.74
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+apiVersion: solution.sap/v1
+kind: Solution
+
+metadata:
+  name: currency-rate-agent
+  version: 1.0.0
+  description: Currency Rate Agent with geolocation-aware dashboard and conversational AI assistant
+
+assets:
+  - ref: ./assets/currency-rate-agent/asset.yaml
+  - ref: ./assets/currency-rate-cap/asset.yaml
