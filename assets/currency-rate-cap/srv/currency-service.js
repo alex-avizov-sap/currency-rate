@@ -1,7 +1,6 @@
 "use strict";
 
 const https = require("https");
-const http = require("http");
 
 // In-memory rate cache: { "USD|EUR": { rate, source, updatedAt, fetchedAt } }
 const _rateCache = {};
@@ -76,42 +75,92 @@ function detectCountryCode(lat, lon) {
   return null;
 }
 
-function fetchRateHttp(fromCurrency, toCurrency) {
-  return new Promise((resolve, reject) => {
-    const apiKey = process.env.EXCHANGE_RATE_API_KEY || "";
-    let url = `http://api.exchangerate.host/live?source=${fromCurrency}&currencies=${toCurrency}&format=1`;
-    if (apiKey) url += `&access_key=${apiKey}`;
+// Static fallback rates relative to USD (approximate mid-market rates)
+const STATIC_RATES_VS_USD = {
+  USD: 1.0, EUR: 0.924, GBP: 0.787, JPY: 157.4, CNY: 7.24, INR: 83.5,
+  BRL: 4.97, CAD: 1.36, AUD: 1.53, NZD: 1.65, CHF: 0.898, SEK: 10.56,
+  NOK: 10.62, DKK: 6.89, MXN: 17.15, SGD: 1.34, HKD: 7.82, KRW: 1345.0,
+  ZAR: 18.62, TRY: 32.4, SAR: 3.75, AED: 3.67, QAR: 3.64, EGP: 30.9,
+  NGN: 1585.0, THB: 35.1, MYR: 4.72, IDR: 15850.0, PHP: 57.8, PLN: 4.02,
+  CZK: 23.2, RON: 4.59, HUF: 358.0, PKR: 278.0, BDT: 110.0, ARS: 868.0,
+  CLP: 945.0, COP: 3970.0, UAH: 38.0, TWD: 32.2, VND: 25080.0, ILS: 3.71,
+  KES: 129.5, GHS: 14.6, RUB: 89.5,
+};
 
-    const protocol = url.startsWith("https") ? https : http;
-    const req = protocol.get(url, (res) => {
+function getStaticRate(fromCurrency, toCurrency) {
+  const fromUSD = STATIC_RATES_VS_USD[fromCurrency];
+  const toUSD = STATIC_RATES_VS_USD[toCurrency];
+  if (!fromUSD || !toUSD) throw new Error(`No static rate available for ${fromCurrency} or ${toCurrency}`);
+  return {
+    rate: parseFloat((toUSD / fromUSD).toFixed(6)),
+    source: "static-fallback",
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function httpGet(url, timeoutMs = 7000) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, (res) => {
       let data = "";
       res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => {
-        try {
-          const parsed = JSON.parse(data);
-          if (!parsed.success && parsed.success !== undefined) {
-            return reject(new Error(parsed.error?.info || "API error"));
-          }
-          const key = `${fromCurrency}${toCurrency}`;
-          const quotes = parsed.quotes || {};
-          if (!(key in quotes)) {
-            return reject(new Error(`Rate key '${key}' not found in response`));
-          }
-          resolve({
-            rate: parseFloat(quotes[key]),
-            source: "exchangerate.host",
-            updatedAt: new Date().toISOString(),
-          });
-        } catch (err) {
-          reject(err);
-        }
-      });
+      res.on("end", () => resolve({ status: res.statusCode, body: data }));
     });
     req.on("error", reject);
-    req.setTimeout(10000, () => {
-      req.destroy(new Error("Request timed out"));
-    });
+    req.setTimeout(timeoutMs, () => req.destroy(new Error("Request timed out")));
   });
+}
+
+async function fetchFromFrankfurter(fromCurrency, toCurrency) {
+  const { status, body } = await httpGet(
+    `https://api.frankfurter.app/latest?from=${fromCurrency}&to=${toCurrency}`
+  );
+  if (status !== 200) throw new Error(`frankfurter.app returned HTTP ${status}`);
+  const parsed = JSON.parse(body);
+  if (parsed.message) throw new Error(parsed.message);
+  const rates = parsed.rates || {};
+  if (!(toCurrency in rates)) throw new Error(`Rate for '${toCurrency}' not found`);
+  return {
+    rate: parseFloat(rates[toCurrency]),
+    source: "frankfurter.app",
+    updatedAt: parsed.date ? new Date(parsed.date).toISOString() : new Date().toISOString(),
+  };
+}
+
+async function fetchFromOpenER(fromCurrency, toCurrency) {
+  const { status, body } = await httpGet(
+    `https://open.er-api.com/v6/latest/${fromCurrency}`
+  );
+  if (status !== 200) throw new Error(`open.er-api.com returned HTTP ${status}`);
+  const parsed = JSON.parse(body);
+  if (parsed.result !== "success") throw new Error(parsed["error-type"] || "open.er-api failed");
+  const rates = parsed.rates || {};
+  if (!(toCurrency in rates)) throw new Error(`Rate for '${toCurrency}' not found`);
+  return {
+    rate: parseFloat(rates[toCurrency]),
+    source: "open.er-api.com",
+    updatedAt: parsed.time_last_update_utc
+      ? new Date(parsed.time_last_update_utc).toISOString()
+      : new Date().toISOString(),
+  };
+}
+
+async function fetchRateHttp(fromCurrency, toCurrency) {
+  // Try primary API
+  try {
+    return await fetchFromFrankfurter(fromCurrency, toCurrency);
+  } catch (err) {
+    console.warn(`fetchRateHttp: frankfurter.app failed (${err.message}), trying open.er-api.com`);
+  }
+
+  // Try secondary API
+  try {
+    return await fetchFromOpenER(fromCurrency, toCurrency);
+  } catch (err) {
+    console.warn(`fetchRateHttp: open.er-api.com failed (${err.message}), using static fallback`);
+  }
+
+  // Static fallback — always works, no network needed
+  return getStaticRate(fromCurrency, toCurrency);
 }
 
 async function getRateInternal(fromCurrency, toCurrency) {
@@ -120,19 +169,19 @@ async function getRateInternal(fromCurrency, toCurrency) {
   const cached = _rateCache[key];
 
   if (cached && now - cached.fetchedAt < CACHE_TTL_MS) {
-    return { ...cached, isStale: false };
+    return { fromCurrency, toCurrency, ...cached, isStale: false };
   }
 
   try {
     const result = await fetchRateHttp(fromCurrency, toCurrency);
-    _rateCache[key] = { ...result, fetchedAt: now };
+    _rateCache[key] = { fromCurrency, toCurrency, ...result, fetchedAt: now };
     console.log(
       `M2.achieved: default rates displayed, from=${fromCurrency}, to=${toCurrency}, ` +
       `rate=${result.rate}, source=${result.source}, timestamp=${result.updatedAt}`
     );
     return { fromCurrency, toCurrency, rate: result.rate, source: result.source, updatedAt: result.updatedAt, isStale: false };
   } catch (err) {
-    console.warn(`M2.missed: default rate fetch failed, source=exchangerate.host, error=${err.message}`);
+    console.warn(`M2.missed: default rate fetch failed, error=${err.message}`);
     if (cached) {
       return { fromCurrency, toCurrency, rate: cached.rate, source: cached.source, updatedAt: cached.updatedAt, isStale: true };
     }

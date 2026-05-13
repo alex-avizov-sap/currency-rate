@@ -27,5 +27,8 @@
   "jest": {
     "testEnvironment": "node",
     "testPathPattern": "test/"
-  }
+  },
+  "workspaces": [
+    "ui"
+  ]
 }
